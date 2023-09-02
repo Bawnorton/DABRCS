@@ -1,0 +1,9 @@
+name: DABRCS
+version: '${project.version}'
+main: com.bawnorton.dabrsc.DABRCS
+api-version: '1.20'
+commands:
+  dabrcs:
+    description: Set DABR Config
+    usage: /<command> <config> <value>
+    aliases: [dabrcs]
