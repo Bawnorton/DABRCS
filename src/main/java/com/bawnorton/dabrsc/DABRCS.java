@@ -1,5 +1,6 @@
 package com.bawnorton.dabrsc;
 
+import com.google.common.io.ByteArrayDataInput;
 import com.google.common.io.ByteArrayDataOutput;
 import com.google.common.io.ByteStreams;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -7,13 +8,14 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 
 public final class DABRCS extends JavaPlugin implements Listener {
-    private static final String HANDSHAKE_CHANNEL = "do_a_barrel_roll:handshake";
+    private static final String CONFIG_SYNC_CHANNEL = "do_a_barrel_roll:config_sync";
 
     FileConfiguration config = getConfig();
 
@@ -26,7 +28,13 @@ public final class DABRCS extends JavaPlugin implements Listener {
         saveConfig();
 
         getServer().getPluginManager().registerEvents(this, this);
-        getServer().getMessenger().registerOutgoingPluginChannel(this, HANDSHAKE_CHANNEL);
+        getServer().getMessenger().registerOutgoingPluginChannel(this, CONFIG_SYNC_CHANNEL);
+        getServer().getMessenger().registerIncomingPluginChannel(this, CONFIG_SYNC_CHANNEL, (channel, player, message) -> {
+            ByteArrayDataInput in = ByteStreams.newDataInput(message);
+            int version = in.readInt();
+            boolean success = in.readBoolean();
+            player.sendMessage("Response from DABR (" + version + "): Success:" + success);
+        });
 
         Objects.requireNonNull(getCommand("dabrcs"), "unreachable").setExecutor((commandSender, command, s, strings) -> {
             if(!commandSender.isOp()) {
@@ -89,7 +97,6 @@ public final class DABRCS extends JavaPlugin implements Listener {
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
         getServer().getScheduler().runTaskLater(this, () -> sendConfig(event.getPlayer()), 20L);
-
     }
 
     private void writeVarInt(ByteArrayDataOutput out, int value) {
@@ -109,14 +116,21 @@ public final class DABRCS extends JavaPlugin implements Listener {
 
     private void sendConfig(Player player) {
         ByteArrayDataOutput out = ByteStreams.newDataOutput();
-        String config = String.format("{\"allowThrusting\": %s, \"forceEnabled\": %s}", getConfig().getBoolean("allowThrusting"), getConfig().getBoolean("forceEnabled"));
 
-        out.writeInt(3);
-        writeVarInt(out, config.length());
-        out.write(config.getBytes(StandardCharsets.UTF_8));
+        out.writeInt(4);
+        out.writeBoolean(config.getBoolean("allowThrusting"));
+        out.writeBoolean(config.getBoolean("forceEnabled"));
         out.writeBoolean(true);
+        // dummy values for full config
+        out.writeBoolean(false);
+        out.writeBoolean(false);
+        out.writeBoolean(false);
+        out.writeInt(0);
+        String value = "VANILLA";
+        writeVarInt(out, value.length());
+        out.write(value.getBytes(StandardCharsets.UTF_8));
 
         DABRCS plugin = JavaPlugin.getPlugin(DABRCS.class);
-        player.sendPluginMessage(plugin, HANDSHAKE_CHANNEL, out.toByteArray());
+        player.sendPluginMessage(plugin, CONFIG_SYNC_CHANNEL, out.toByteArray());
     }
 }
