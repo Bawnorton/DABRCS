@@ -2,6 +2,7 @@ name: DABRCS
 version: '${project.version}'
 main: com.bawnorton.dabrsc.DABRCS
 api-version: '1.21'
+folia-supported: true
 commands:
   dabrcs:
     description: Set DABR Config
